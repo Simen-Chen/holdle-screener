@@ -38,7 +38,7 @@ What makes it different from yet another "golden cross bot":
 No API keys, no network — first confirm the logic is sound:
 
 ```bash
-git clone https://github.com/<your-name>/holdle-screener.git
+git clone https://github.com/Simen-Chen/holdle-screener.git
 cd holdle-screener
 
 # 1. Indicator & rule self-test (27 assertions, zero dependencies)

@@ -54,7 +54,7 @@ python rules.py && python simtest.py && python screen.py --selftest
 不需要密钥、不需要网络，先确认逻辑是通的：
 
 ```bash
-git clone https://github.com/<your-name>/holdle-screener.git
+git clone https://github.com/Simen-Chen/holdle-screener.git
 cd holdle-screener
 
 # ① 指标与规则自检（27 项，零依赖）
