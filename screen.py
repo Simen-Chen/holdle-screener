@@ -86,9 +86,9 @@ def eligible(full: list[dict], today: str) -> tuple[list[dict], list[tuple[dict,
     闸门（状态A ∧ 前置校验 ∧ 第一根红柱）只管**信号**成不成立，不管这个信号
     还有没有效、这只票还买不买得到。两道过滤：
 
-      ① 失效期已过 —— 模块C C9：H 之后 60 天没突破，本次入场作废。
+      ① 失效期已过 —— 失效期规则：H 之后 60 天没突破，本次入场作废。
          典型是 PANW：H=367.50，现价 374.99 已经在 H 上方，但失效日 09-04 早过了。
-         现在追进去就是 C7 明令禁止的「错过初期去追高」。
+         现在追进去就是「错过初期不追」明令禁止的追高。
       ② 日K数据陈旧 —— 价格都取不到新的，谈不上「突破」。
     """
     ok: list[dict] = []
@@ -99,7 +99,7 @@ def eligible(full: list[dict], today: str) -> tuple[list[dict], list[tuple[dict,
             continue
         dl = r.get("deadline")
         if dl and today > dl:
-            bad.append((r, f"失效期已过（{dl}，模块C C9）"))
+            bad.append((r, f"失效期已过（{dl}，失效期规则）"))
             continue
         # 入场机会已消耗：H 被站上过、又跌回来了。
         # 典型是 BAC：信号月 2026-06，H=62.66（07-27），08-12 收盘 64.48 已站上，
@@ -235,7 +235,7 @@ def render_md(rows: list[dict], full: list[dict], errs: list[tuple[str, str]],
     L: list[str] = []
     L.append(f"# 选股扫描报告 · {today}\n")
     L.append(f"> 候选池 {n_universe} 只 ｜ 网络请求 {md.requests} 次 ｜ "
-             f"体系：HOLDLE 模块C ｜ 池子：`universe.json`\n")
+             f"体系：趋势跟随体系 ｜ 池子：`universe.json`\n")
     L.append("> ⚠️ 本报告为规则筛选留痕，**不构成投资建议**。\n")
 
     n_a = sum(1 for r in rows if r["state_a"])
@@ -285,8 +285,8 @@ def render_md(rows: list[dict], full: list[dict], errs: list[tuple[str, str]],
             L.append(f"| {r['symbol']} | {r['sector']} | {r['price']:.2f} | "
                      f"{h_txt} | {why} |")
         L.append("")
-        L.append("> 「失效期已过」不是 bug —— 模块C C9 规定 H 之后 50–60 天不突破即作废，")
-        L.append("> 现在追进去就是 C7 明令禁止的「错过初期去追高」。\n")
+        L.append("> 「失效期已过」不是 bug —— 失效期规则规定 H 之后 50–60 天不突破即作废，")
+        L.append("> 现在追进去就是「错过初期不追」明令禁止的追高。\n")
 
     L.append("## 四、接近的标的（有信号但闸门未全过）\n")
     near = [r for r in rows if (not r["gate_ok"]) and (r["scenario"] or (r["state_a"] and r["pre_ok"]))]

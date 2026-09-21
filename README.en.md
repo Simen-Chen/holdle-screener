@@ -295,9 +295,13 @@ Before opening a PR, make sure `python rules.py && python simtest.py && python s
 ## License & attribution
 
 Code released under the **MIT License**, see [LICENSE](LICENSE).
+Full copyright, attribution, trademark and disclaimer terms: **[NOTICE.md](NOTICE.md)** — **please read it before redistributing.**
 
-- Methodology source: the **HOLDLE public course**. Copyright belongs to its original author. This repository is an independent implementation, not affiliated with or endorsed by the original author.
-- This repository contains **no** course material — only a code implementation of its rules and the engineering around it.
+- **Methodology source**: the HOLDLE public course. Copyright in the methodology and its expression belongs to its original author.
+- **Independent implementation**: not affiliated with, not cooperating with, and not endorsed by the original author. The name in the repository title is used only to **identify the rule set's origin** (nominative use).
+- **No course material**: this repository contains no course text, slides, videos, images or paid content. The docs describe *what the code does*, not what the course says.
+- **Rules ≠ expression**: copyright protects specific expression (text, charts, media), not ideas or methods. This project implements rule logic and describes it in its own words.
+- **Rights holders can object**: if you believe the name or content exceeds fair reference, open an issue and we will rename or remove the material.
 
 ---
 

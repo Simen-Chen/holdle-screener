@@ -1,7 +1,7 @@
 """
 HOLDLE 体系 · 规则引擎（纯函数，零外部依赖）
 
-严格照 02_知识拆解/模块C_择时体系_拆解.md 与 模块D_管理体系_拆解.md 实现。
+规则分为「择时」与「风控」两组，见 docs/methodology.md。
 所有参数从 config.json 的 rules 段读入，本文件不写死任何阈值。
 
 本文件可以单独跑：python rules.py 会执行内置自检。
@@ -42,7 +42,7 @@ def macd(closes: list[float], fast: int = 12, slow: int = 26, signal: int = 9):
     return dif, dea, hist
 
 
-# ---------------------------------------------------------------- 模块C 3.1
+# ---------------------------------------------------------------- 择时·状态A
 
 def is_state_a(dif: list[float], dea: list[float], hist: list[float], i: int = -1) -> bool:
     """状态A = 月线 DIF > 0 且 DEA > 0 且 柱 > 0（三项同时）。"""
@@ -53,7 +53,7 @@ def is_state_a(dif: list[float], dea: list[float], hist: list[float], i: int = -
 
 def precheck(highs: list[float], lows: list[float], lookback: int = 5,
              drop_last: bool = False) -> tuple[bool, str]:
-    """模块C 3.1 前置校验：月K低点逐月抬高 + 高点逐月抬高。
+    """前置校验：月K低点逐月抬高 + 高点逐月抬高。
 
     drop_last=True 时忽略最后一根（当月未走完）。
     """
@@ -70,7 +70,7 @@ def precheck(highs: list[float], lows: list[float], lookback: int = 5,
     return (ok_h and ok_l), detail
 
 
-# ---------------------------------------------------------------- 模块C 3.2 / 3.4
+# ---------------------------------------------------------------- 择时·第一根红柱与重入
 
 SCENARIO1 = "场景一·由绿转红"
 SCENARIO2 = "场景二·由矮变高"
@@ -159,7 +159,7 @@ def is_contracting(hist: list[float]) -> bool:
     return len(hist) >= 2 and hist[-1] < hist[-2]
 
 
-# ---------------------------------------------------------------- 模块D 4.2
+# ---------------------------------------------------------------- 三级止损
 
 @dataclass
 class StopInfo:
@@ -169,7 +169,7 @@ class StopInfo:
 
 
 def stop_line(entry_price: float, current_price: float, cfg: dict) -> StopInfo:
-    """模块D 4.2 三级止损。"""
+    """三级止损 三级止损。"""
     if current_price >= entry_price * cfg["trail_trigger_3"]:
         return StopInfo(entry_price * cfg["stop_loss_3"], 3, "三级·保本")
     if current_price >= entry_price * cfg["trail_trigger_2"]:
@@ -177,11 +177,11 @@ def stop_line(entry_price: float, current_price: float, cfg: dict) -> StopInfo:
     return StopInfo(entry_price * cfg["stop_loss_1"], 1, "一级·−20%")
 
 
-# ---------------------------------------------------------------- 模块D 3.3
+# ---------------------------------------------------------------- 周K有效低点规则
 
 def weekly_effective_low(highs: list[float], lows: list[float], hist: list[float],
                          window: int = 3) -> tuple[Optional[float], list[tuple[str, float]]]:
-    """模块D 3.3 周K有效低点（近似实现）。
+    """周K有效低点规则 周K有效低点（近似实现）。
 
     ① 找摆动低点 L
     ② 回撤期间周K MACD 出现绿柱
@@ -234,12 +234,12 @@ def weekly_effective_low(highs: list[float], lows: list[float], hist: list[float
     return seq[-1][1], seq
 
 
-# ---------------------------------------------------------------- 模块C 3.3
+# ---------------------------------------------------------------- 择时·参考价 H
 
 def find_reference_high(daily_highs: list[float], daily_lows: list[float],
                         daily_hist: list[float], start_idx: int,
                         window: int = 5) -> tuple[Optional[int], Optional[float], str]:
-    """模块C 3.3：在 start_idx 之后找「冲高 → 回撤且日K出绿柱」的第一个高点 H。
+    """择时·参考价 H：在 start_idx 之后找「冲高 → 回撤且日K出绿柱」的第一个高点 H。
 
     返回 (H 下标, H 价格, 说明)
 

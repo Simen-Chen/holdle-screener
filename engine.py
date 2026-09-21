@@ -1,5 +1,5 @@
 """
-主引擎：扫描观察池 → 按模块C/D 出决策 → （可选）在 Alpaca 模拟盘下单 → 记账。
+主引擎：扫描观察池 → 按择时与风控规则出决策 → （可选）在 Alpaca 模拟盘下单 → 记账。
 
 用法：
     python run.py scan       只扫描，输出决策与计划（不下单）
@@ -53,7 +53,7 @@ def _month_key(date_str: str) -> str:
 
 
 def monthly_signal(item: dict, monthly: list[dict], cfg: dict, today: str) -> dict:
-    """只用月线就能算出来的那部分判定（模块C 3.1 / 3.2 / 3.4）。
+    """只用月线就能算出来的那部分判定（择时·闸门与重入）。
 
     为什么单独抽出来：`screen.py` 的第一级粗筛要扫 180+ 只票，只取月线；
     它必须和 `analyze()` 走**同一份代码**。两处各写一遍迟早会漂移，而且这种漂移
@@ -159,7 +159,7 @@ def analyze(item: dict, monthly: list[dict], weekly: list[dict],
     # 为什么需要这个字段：入场流程假设你**从信号月就开始盯**。但扫描器是后补进来的，
     # 它可能捞到一个 3 个月前的信号，而那个信号的入场机会早在几周前就用掉了 ——
     # 价格突破 H、又跌回 H 下方。此时系统如果还傻等"突破 H"，等的其实是**第二次突破**，
-    # 那不是体系里的买点，是 C7 明令禁止的「错过初期去追高」。
+    # 那不是体系里的买点，是「错过初期不追」明令禁止的追高。
     #
     # 真实案例 BAC：信号月 2026-06，H=62.66（07-27），08-12 收盘 64.48 已站上 H，
     # 到 09-18 又跌回 58.16。若不加这道闸，系统会在它重新爬回 62.66 时买入。
@@ -242,13 +242,13 @@ def decide(row: dict, cfg: dict, state: dict) -> list[dict]:
                  "reason": row.get("data_note", "数据异常"),
                  "detail": "数据体检不通过 → 该标的本次完全不参与判定（含持仓）"}]
 
-    # ---------- ① 持仓管理（模块D 3.2） ----------
+    # ---------- ① 持仓管理 ----------
     if pos:
         if row["weekly_ref"] and price < row["weekly_ref"]:
             acts.append({
                 "type": "SELL", "symbol": sym, "qty": pos["qty"],
                 "reason": f"跌破周K有效低点 {row['weekly_ref']:.2f}",
-                "detail": "模块D 3.3 周K低点规则：跌破即离场",
+                "detail": "周K有效低点规则：跌破即离场",
             })
         else:
             si = rules.stop_line(pos["entry_price"], price, R)
@@ -259,7 +259,7 @@ def decide(row: dict, cfg: dict, state: dict) -> list[dict]:
                 acts.append({
                     "type": "SELL", "symbol": sym, "qty": pos["qty"],
                     "reason": f"{si.label} 止损触发（{price:.2f} < {si.line:.2f}）",
-                    "detail": "模块D 4.2 三级止损，机械执行",
+                    "detail": "三级止损，机械执行",
                 })
             else:
                 acts.append({
@@ -290,7 +290,7 @@ def decide(row: dict, cfg: dict, state: dict) -> list[dict]:
             acts.append({
                 "type": "CANCEL", "symbol": sym,
                 "reason": f"{R['breakout_deadline_days']} 天未突破参考价，本次入场作废",
-                "detail": "模块C C9：取消，不补仓、不死扛，等下一次状态A",
+                "detail": "失效期规则：取消，不补仓、不死扛，等下一次状态A",
             })
             return acts
         if h_now and price > h_now:
@@ -306,7 +306,7 @@ def decide(row: dict, cfg: dict, state: dict) -> list[dict]:
                 "type": "CANCEL", "symbol": sym,
                 "reason": (f"参考价 {h_now:.2f} 已于 {row['h_broken_date']} "
                            f"被突破过，现价已回落其下 → 本次入场机会已消耗"),
-                "detail": "模块C C7「错过初期不追」：只在第一次突破时买",
+                "detail": "「错过初期不追」：只在第一次突破时买",
             })
             return acts
         acts.append({
@@ -317,7 +317,7 @@ def decide(row: dict, cfg: dict, state: dict) -> list[dict]:
         })
         return acts
 
-    # ---------- ③ 新信号（模块C 3.3 / 3.4） ----------
+    # ---------- ③ 新信号（择时·参考价 H / 重新入场） ----------
     if not (row["state_a"] and row["pre_ok"] and row["scenario"]):
         return acts
 
@@ -327,7 +327,7 @@ def decide(row: dict, cfg: dict, state: dict) -> list[dict]:
     # 或者定时任务漏跑了）。既然不在场，就无法判断"突破之后已经走了多远"：
     # 现价可能只比 H 高 1%，也可能先冲到 +30% 再回到 +1%。这两种情形买进去
     # 完全是两回事，而数据里看不出区别。
-    # 分不清 → 不做。这与 C7「错过初期不追」和"宁可不动，不可乱动"同一条原则。
+    # 分不清 → 不做。这与「错过初期不追」和"宁可不动，不可乱动"同一条原则。
     #
     # ⚠️ 判据是"突破过"本身，**与现价在 H 上方还是下方无关** —— 我第一版只按
     # "现价回落"过滤，结果把 CVX（现价 211.59 仍在 H=208.91 上方）的理由写成了
@@ -338,7 +338,7 @@ def decide(row: dict, cfg: dict, state: dict) -> list[dict]:
         return [{"type": "SKIP", "symbol": sym,
                  "reason": (f"入场机会已消耗：参考价 H={hp:.2f} 已于 "
                             f"{row['h_broken_date']} 被突破过，现价 {price:.2f}（{where}）"),
-                 "detail": "模块C C7「错过初期不追」：突破那天不在场，无法判断已走了多远；"
+                 "detail": "「错过初期不追」：突破那天不在场，无法判断已走了多远；"
                            "等下一次状态A（场景一·由绿转红）"}]
 
     is_reentry = (row["scenario"] == rules.SCENARIO2)
@@ -349,22 +349,22 @@ def decide(row: dict, cfg: dict, state: dict) -> list[dict]:
         if last_stop is None:
             return [{"type": "SKIP", "symbol": sym,
                      "reason": "场景二但本轮无止损记录 → 属「错过初期」，不入场",
-                     "detail": "模块C C7 错过就不追；提案 E-1（放开状态A 中段入场）建议不做"}]
+                     "detail": "「错过初期不追」：错过就不追（放宽到状态A 中段入场的方案，本实现不采用）"}]
         if R["require_reentry_above_stop"] and price <= last_stop:
             return [{"type": "SKIP", "symbol": sym,
                      "reason": f"R1 未满足：现价 {price:.2f} ≤ 上次止损价 {last_stop:.2f}",
-                     "detail": "模块C R1：禁止变相摊平"}]
+                     "detail": "重入规则 R1：禁止变相摊平"}]
         if cyc.get("reentries", 0) >= R["max_reentry_per_cycle"]:
             return [{"type": "SKIP", "symbol": sym,
                      "reason": f"R3 已达上限：同轮状态A 已重入 {cyc['reentries']} 次",
-                     "detail": "模块C R3：该轮作废，等下一个由绿转红"}]
+                     "detail": "重入规则 R3：该轮作废，等下一个由绿转红"}]
 
     # 行业上限
     counts = _sector_count(state, cfg)
     if counts.get(row["sector"], 0) >= A["same_sector_max"]:
         return [{"type": "SKIP", "symbol": sym,
                  "reason": f"行业上限：{row['sector']} 已有 {counts[row['sector']]} 只（≤{A['same_sector_max']}）",
-                 "detail": "模块D D1：同一行业 ≤2 只"}]
+                 "detail": "行业分散规则：同一行业 ≤2 只"}]
 
     acts.append({
         "type": "ARM", "symbol": sym,
@@ -497,7 +497,7 @@ def write_ledger(rows: list[dict], records: list[dict], cfg: dict,
     L.append(f"# AI 交易操作记录 · {today}\n")
     L.append(f"> 模式：**{mode}**"
              f"{'（dry-run，未真实下单）' if mode == 'dry' else '（Alpaca 模拟盘）'}"
-             f" ｜ 体系：HOLDLE 模块C/D ｜ 观察池：{len(rows)} 只\n")
+             f" ｜ 体系：趋势跟随体系 ｜ 观察池：{len(rows)} 只\n")
     L.append("> ⚠️ 本记录为规则执行留痕，**不构成投资建议**。\n")
 
     L.append("## 一、本次动作\n")

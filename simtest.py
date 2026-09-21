@@ -122,9 +122,9 @@ def part1() -> None:
     check("持仓 + 跌破周K有效低点 → SELL", types_of(a) == {"SELL"}
           and "周K" in a[0]["reason"], a)
 
-    # 10 场景二 + 无止损记录 → SKIP（C7 错过初期不追）
+    # 10 场景二 + 无止损记录 → SKIP（错过初期不追）
     a = engine.decide(make_row(scenario=rules.SCENARIO2), CFG, fresh_state())
-    check("场景二 + 无止损记录 → SKIP（C7）", types_of(a) == {"SKIP"}, a)
+    check("场景二 + 无止损记录 → SKIP（错过初期不追）", types_of(a) == {"SKIP"}, a)
 
     # 11 场景二 + 有止损记录 + 价 ≤ 止损价 → SKIP（R1）
     st = fresh_state()
@@ -414,7 +414,7 @@ def part7() -> None:
 
     背景（真实踩坑）：扫描器一次捞 184 只、信号回溯 4 个月，很容易捞到
     「几周前就已经突破过 H、现在又跌回来」的标的。若不加这道闸，系统会把
-    **第二次突破**当成买点，而那是模块C C7 明令禁止的「错过初期去追高」。
+    **第二次突破**当成买点，而那是「错过初期不追」规则 明令禁止的「错过初期去追高」。
 
     真实案例 BAC：信号月 2026-06，H=62.66（07-27），08-12 收盘 64.48 已站上 H，
     到 09-18 又跌回 58.16。
