@@ -1,0 +1,42 @@
+name: tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  offline-tests:
+    name: 离线测试（无需网络与密钥）
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: 准备 config.json
+        run: cp config.example.json config.json
+
+      - name: rules.py 自检（27 项）
+        run: python rules.py
+
+      - name: simtest.py 离线全链路演练（70 项）
+        run: python simtest.py
+
+      - name: screen.py 选股逻辑自检（28 项）
+        run: python screen.py --selftest
+
+      - name: run.py selftest
+        run: python run.py selftest
+
+      # 说明：verify_vs_reference.py 需要拉取行情，不在 CI 里跑。
+      # 那一步需要 ALPACA_API_KEY / ALPACA_SECRET_KEY，属于本地校验。

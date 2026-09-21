@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 560" width="900" height="560" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1b1f24"/>
+      <stop offset="100%" stop-color="#14181d"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2b3138"/>
+      <stop offset="100%" stop-color="#22272d"/>
+    </linearGradient>
+    <clipPath id="screen"><rect x="0" y="42" width="900" height="518" rx="0"/></clipPath>
+  </defs>
+
+  <!-- 终端窗口 -->
+  <rect x="0" y="0" width="900" height="560" rx="10" fill="url(#bg)" stroke="#2f353c" stroke-width="1"/>
+  <rect x="0" y="0" width="900" height="42" rx="10" fill="url(#bar)"/>
+  <rect x="0" y="30" width="900" height="12" fill="url(#bar)"/>
+  <line x1="0" y1="42" x2="900" y2="42" stroke="#343b43" stroke-width="1"/>
+
+  <!-- 红绿灯 -->
+  <circle cx="22" cy="21" r="6" fill="#ff5f57"/>
+  <circle cx="42" cy="21" r="6" fill="#febc2e"/>
+  <circle cx="62" cy="21" r="6" fill="#28c840"/>
+  <text x="450" y="26" fill="#8b949e" font-size="13" text-anchor="middle">holdle-screener — python screen.py</text>
+
+  <g clip-path="url(#screen)" font-size="14" fill="#c9d1d9">
+    <!-- 命令 -->
+    <text x="24" y="74" fill="#7ee787">$</text>
+    <text x="42" y="74">python screen.py</text>
+
+    <text x="24" y="104" fill="#8b949e"># 选股扫描报告 · 2026-09-21</text>
+    <text x="24" y="126" fill="#8b949e">候选池 184 只 ｜ 网络请求 202 次 ｜ 池子：universe.json</text>
+
+    <!-- 表头 -->
+    <text x="24" y="164" fill="#58a6ff" font-weight="bold">## 一、漏斗</text>
+    <line x1="24" y1="176" x2="876" y2="176" stroke="#30363d" stroke-width="1"/>
+    <text x="24" y="198" fill="#8b949e">环节                        判据                                    通过</text>
+    <line x1="24" y1="208" x2="876" y2="208" stroke="#30363d" stroke-width="1"/>
+
+    <!-- 表格行 -->
+    <text x="24" y="232">候选池                      universe.json                            184</text>
+    <text x="24" y="256">① 状态A                     月线 DIF&gt;0 ∧ DEA&gt;0 ∧ 柱&gt;0                87</text>
+    <text x="24" y="280">② 前置校验                  月K低点逐月抬高 ∧ 高点逐月抬高             42</text>
+    <text x="24" y="304">③ 第一根红柱                由绿转红 ∨ 由矮变高（≥上月×1.10）         41</text>
+    <text x="24" y="328" fill="#ffa657">闸门过了但不可交易          失效期已过 / 数据体检不过                 −3</text>
+    <line x1="24" y1="342" x2="876" y2="342" stroke="#30363d" stroke-width="1"/>
+    <text x="24" y="366" fill="#7ee787" font-weight="bold">入场闸门                    ①∧②∧③ 且仍有效                           6</text>
+    <line x1="24" y1="380" x2="876" y2="380" stroke="#30363d" stroke-width="1"/>
+
+    <!-- 通过标的 -->
+    <text x="24" y="416" fill="#58a6ff" font-weight="bold">## 二、通过入场闸门的标的</text>
+    <text x="24" y="442" fill="#8b949e">标的     行业        现价       场景              参考价 H    距 H</text>
+    <text x="24" y="466">V        金融        367.63     场景一·由绿转红   382.06     -3.78%</text>
+    <text x="24" y="490">JPM      金融        349.40     场景一·由绿转红   366.30     -4.61%</text>
+    <text x="24" y="514">SCHW     金融        105.22     场景一·由绿转红   110.69     -4.94%</text>
+    <text x="24" y="538">GILD     医疗保健    149.99     场景一·由绿转红   151.58     -1.05%</text>
+
+    <!-- 底部提示 -->
+    <rect x="700" y="500" width="176" height="34" rx="6" fill="#1f6feb" opacity="0.15"/>
+    <text x="788" y="522" fill="#58a6ff" font-size="12" text-anchor="middle">184 → 6 ｜ 大部分时间该空仓</text>
+  </g>
+</svg>

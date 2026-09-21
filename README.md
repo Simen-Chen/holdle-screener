@@ -6,6 +6,22 @@
 ⚠️ **免责声明：本项目是规则验证工具，不是投资建议，也不是能赚钱的策略。**
 **作者不保证任何收益。市场有风险，用它亏钱是你自己的事。请先读「已知限制」一节。**
 
+![选股扫描输出](docs/demo.svg)
+
+---
+
+## 30 秒了解
+
+```bash
+git clone <this-repo> && cd holdle-screener
+python rules.py && python simtest.py && python screen.py --selftest
+# → 27 通过 / 0 失败
+# → 70 通过 / 0 失败
+# → 28 通过 / 0 失败
+```
+
+不用密钥、不用联网。**先确认逻辑是通的，再谈接数据。**
+
 ---
 
 ## 这是什么
