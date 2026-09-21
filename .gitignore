@@ -1,0 +1,44 @@
+# ---- 密钥与凭证（最重要，先写这一条）----
+.env
+.env.*
+*.key
+*.pem
+secrets.json
+*secret*
+*credential*
+
+# ---- 个人配置（含自己的观察池 / 授权期限）----
+config.json
+
+# ---- 运行产物（含账户数据，不要开源）----
+state/
+ledger/
+reports/
+screens/
+*.jsonl
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 其他 ----
+*.log
+*.tmp
+*.bak

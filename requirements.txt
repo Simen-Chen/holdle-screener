@@ -1,0 +1,14 @@
+# 依赖
+
+# 唯一必需的外部依赖：Alpaca 官方 SDK（行情 + 模拟盘下单）
+alpaca-py>=0.21.0
+
+# 说明：
+#   rules.py / simtest.py / screen.py --selftest / run.py selftest
+#   只用标准库，不装依赖、不联网、不需要密钥也能跑。
+#   只有真正拉行情、连模拟盘时才需要 alpaca-py。
+#
+# 安装：
+#   python -m pip install -r requirements.txt
+#
+# Python 版本：3.10+（代码使用了 tuple[str, str] 这类内置泛型写法）
