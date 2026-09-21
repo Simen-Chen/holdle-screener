@@ -1,53 +1,89 @@
 # holdle-screener
 
-> A trend-following methodology — *pick well → wait well → manage well* — translated into
-> executable, testable, reviewable code. Runs on an Alpaca paper account. **Zero gut feeling.**
+A trend-following methodology — *pick well → wait well → manage well* — written as code that
+runs, that you can test, and that leaves a record you can review afterwards. It trades an
+Alpaca paper account.
 
-⚠️ **DISCLAIMER: This is a rule-verification tool. It is NOT investment advice, and it is
-NOT a profitable strategy. The author guarantees nothing. Please read "Known limitations"
-before using it. Trading involves substantial risk of loss.**
+To be clear up front: this is a rule-verification tool. It is not investment advice and it is
+not a profitable strategy. I guarantee nothing. Read "Known limitations" before you use it.
+
+![Screener output](docs/demo.svg)
 
 ---
 
-## What it is
+## 30 seconds
 
-A monthly-signal / daily-trigger / rules-based-risk US-equity EOD trading system.
+```bash
+git clone git@github.com:Simen-Chen/holdle-screener.git
+cd holdle-screener
+python rules.py && python simtest.py && python screen.py --selftest
+# -> 27 passed / 0 failed
+# -> 70 passed / 0 failed
+# -> 28 passed / 0 failed
+```
 
-- **Pick well** — coarse screen over a 184-ticker pool of mature large caps (`universe.json`, 11 GICS sectors)
-- **Wait well** — a three-gate entry: monthly **State A** + **structural pre-check** + **first red bar**, then wait for a breakout above the prior swing high
-- **Manage well** — three-tier stop loss, weekly effective-low exit, ≤2 positions per sector, equal weight
+No API keys, no network. Confirm the logic holds up first, worry about data later.
 
-What makes it different from yet another "golden cross bot":
+---
 
-| Property | Detail |
-|---|---|
-| **Rules decoupled from code** | Every parameter (MACD periods, thresholds, stop levels, lookbacks) lives in `config.json`. Change rules without touching code. |
-| **Verifiable offline** | 141 assertions that need **no network and no API keys**. `python simtest.py` runs in seconds. Indicator math is cross-checked against external reference values. |
-| **Failure modes handled explicitly** | Adjustment mismatch, delisted tickers with stale signals, corrupted data while holding a position, already-consumed entry opportunities — each has a dedicated gate and a regression test. |
+## What this is
 
-## What it is NOT
+An end-of-day US equity system. Monthly bars set the direction, daily bars pick the entry,
+and rules handle everything after that.
 
-- ❌ **Not a live-trading tool.** `TradingClient(paper=True)` is **hard-coded**. It is physically impossible to route an order to a live account.
-- ❌ **Not a complete implementation.** The fundamental six-factor screen (ROE / gross margin / net margin / cash ratio / EPS) is **not implemented**. "Pick well" is approximated by a hand-curated pool of mature companies. This is the biggest gap.
-- ❌ **No promise of beating the market.** SPY benchmark comparison is built in precisely so the system cannot fool itself.
+Stock selection starts from a pool of 184 mature large caps in `universe.json`, grouped into
+11 GICS sectors.
+
+Timing is a three-gate entry: monthly State A, a structural pre-check on the monthly candles,
+and a "first red bar". All three have to hold before anything happens. Then it waits for a
+breakout above the prior swing high.
+
+Risk is handled with a three-tier stop, a weekly effective-low exit, a two-positions-per-sector
+cap, equal weight, and a single entry per name.
+
+Three things make this worth more than yet another golden-cross bot:
+
+Rules live outside the code. MACD periods, thresholds, stop levels, lookback lengths — all of
+it sits in `config.json`. Change the rules by editing config, not source.
+
+The tests need no network. 141 assertions, and `python simtest.py` finishes in seconds. The
+indicator math is also cross-checked against external reference values, so I know the MACD it
+computes matches what everyone else computes.
+
+Failure modes are handled explicitly. Adjustment mismatches, stale signals from delisted
+tickers, corrupted data while holding a position, entry opportunities that were already
+consumed — each one has a gate and a regression test behind it. More on those below.
+
+## What this is not
+
+Not a live trading tool. `TradingClient(paper=True)` is hard-coded, so it is physically
+impossible to route an order to a live account.
+
+Not a complete implementation. The methodology's six-factor fundamental screen (ROE, gross
+margin, net margin, cash ratio, EPS) is not in here. Stock selection is approximated by a
+hand-picked pool of mature companies rather than computed from financials. That is the biggest
+gap by far.
+
+And it is not guaranteed to beat the market. The SPY benchmark comparison is built in
+precisely so the system cannot fool itself.
 
 ---
 
 ## Quickstart
 
-No API keys, no network — first confirm the logic is sound:
+No keys, no network. Run these three first:
 
 ```bash
-git clone https://github.com/Simen-Chen/holdle-screener.git
+git clone git@github.com:Simen-Chen/holdle-screener.git
 cd holdle-screener
 
-# 1. Indicator & rule self-test (27 assertions, zero dependencies)
+# Indicator and rule self-test: 27 assertions, zero dependencies
 python rules.py
 
-# 2. Offline end-to-end drill (70 assertions, includes a decision truth table)
+# Offline end-to-end drill: 70 assertions, includes the decision truth table
 python simtest.py
 
-# 3. Screener logic self-test (28 assertions, zero dependencies)
+# Screener logic self-test: 28 assertions, zero dependencies
 python screen.py --selftest
 ```
 
@@ -57,15 +93,49 @@ Once all three are green, connect real data:
 cp config.example.json config.json
 python -m pip install -r requirements.txt
 
-# Prints WHERE the keys were read from (never the keys themselves)
+# Prints where the keys were read from, never the keys themselves
 python alpaca_io.py
 
-# Dry run: decisions and plans only — no orders, no config writes
+# Dry run: decisions and plans only, no orders, no config writes
 python run.py scan
 
-# Screen the broad universe (read-only)
+# Screen the broad universe, read-only
 python screen.py
 ```
+
+<details>
+<summary>What the real output looks like</summary>
+
+```
+$ python simtest.py
+── Part 1 · 决策真值表 ──
+  ✅ 状态A + 前置校验 + 第一根红柱 → ARM（等待突破）
+  ✅ 无信号 → 不动作
+  ...
+演练结果：70 通过 / 0 失败
+```
+
+```
+$ python screen.py
+# 选股扫描报告 · 2026-09-21
+
+> 候选池 184 只 ｜ 网络请求 202 次 ｜ 趋势跟随体系 ｜ 池子：`universe.json`
+
+## 一、漏斗
+| 环节 | 判据 | 通过 |
+|---|---|---|
+| 候选池 | `universe.json` | 184 |
+| ① 状态A | 月线 DIF>0 ∧ DEA>0 ∧ 柱>0 | 87 |
+| ② 前置校验 | 月K低点逐月抬高 ∧ 高点逐月抬高 | 42 |
+| ③ 第一根红柱 | 由绿转红 ∨ 由矮变高（≥上月×1.10） | 41 |
+| 闸门过了但不可交易 | 失效期已过 / 数据体检不过 | −3 |
+| 入场闸门 | ①∧②∧③ 且仍有效 | 6 |
+```
+
+The funnel narrowing as it goes down is expected. Monthly-level signals are rare, and most of
+the time the correct position is no position.
+
+</details>
 
 ---
 
@@ -75,18 +145,18 @@ python screen.py
 flowchart TD
     U["universe.json<br/>184 mature large caps"] --> L1
 
-    subgraph L1["Stage 1 — monthly bars only (184 requests)"]
+    subgraph L1["Stage 1 (monthly bars only, 184 requests)"]
         A{"State A<br/>DIF>0 ∧ DEA>0 ∧ hist>0"}
-        B{"Pre-check<br/>monthly lows & highs rising"}
-        C{"First red bar<br/>green→red ∨ shrinking→expanding ≥×1.10"}
+        B{"Pre-check<br/>monthly lows and highs rising"}
+        C{"First red bar<br/>green→red ∨ shrinking→expanding ≥x1.10"}
         A --> B --> C
     end
 
     L1 -->|"survivors only"| L2
 
-    subgraph L2["Stage 2 — add weekly + daily bars"]
-        D["Data integrity check<br/>single-day gaps / cross-timeframe consistency"]
-        E["Wait for pullback<br/>daily green bar → set reference high H"]
+    subgraph L2["Stage 2 (add weekly + daily bars)"]
+        D["Data integrity<br/>single-day gaps / cross-timeframe consistency"]
+        E["Wait for pullback<br/>daily green bar → reference high H"]
         F["Buy only on close above H"]
         D --> E --> F
     end
@@ -99,210 +169,258 @@ flowchart TD
 
 | Concept | Definition |
 |---|---|
-| **State A** | Monthly MACD: `DIF > 0 ∧ DEA > 0 ∧ histogram > 0` (histogram = 2×(DIF−DEA)) |
-| **Pre-check** | Monthly lows rising **and** monthly highs rising; a downtrending monthly chart is rejected outright |
-| **First red bar** | Scenario 1 "green→red": last month's hist < 0, this month's > 0. Scenario 2 "shrinking→expanding": after months of contraction, this month's hist > last month's × 1.10 |
-| **Entry gate** | `State A ∧ Pre-check ∧ First red bar` — all three required |
-| **Reference high H** | From the next month on, switch to daily bars; wait for a pullback with a daily green bar; H is the **first** local high inside the entry window meeting all conditions |
-| **Buy trigger** | Close > H. Void if not broken within **60 days** |
-| **Three-tier stop** | Entry price P×0.80; once up >20% → P×0.90; once up >30% → P (breakeven). Then switch to the weekly effective-low rule |
+| State A | Monthly MACD: `DIF > 0 ∧ DEA > 0 ∧ histogram > 0` (histogram = 2×(DIF−DEA)) |
+| Pre-check | Monthly lows rising and monthly highs rising. A downtrending monthly chart is rejected outright |
+| First red bar | Scenario 1, "green to red": last month's histogram < 0 and this month's > 0. Scenario 2, "shrinking to expanding": after months of contraction, this month's histogram > last month's × 1.10 |
+| Entry gate | State A, pre-check, and first red bar — all three |
+| Reference high H | From the next month on, switch to daily bars. Wait for a pullback with a daily green bar, then take the first local high inside the entry window that has a real pullback with a green bar during it |
+| Buy trigger | Close above H. Void if not broken within 60 days |
+| Three-tier stop | Entry price P×0.80; once up more than 20%, move to P×0.90; once up more than 30%, move to P (breakeven). After that, the weekly effective-low rule takes over |
 
-### Code ↔ rule mapping
+### Code to rule mapping
 
-`rules.py` is the pure-function layer (zero dependencies, self-testable on its own);
+`rules.py` is the pure-function layer — zero dependencies, self-testable on its own.
 `engine.py` is the orchestration layer.
 
 | Code | Rule |
 |---|---|
 | `rules.is_state_a()` | State A |
-| `rules.precheck()` | Monthly low/high rising |
-| `rules.recent_first_red_bar()` | First red bar (both scenarios + ×1.10 threshold) |
+| `rules.precheck()` | Monthly lows and highs rising |
+| `rules.recent_first_red_bar()` | First red bar, both scenarios plus the ×1.10 threshold |
 | `rules.find_reference_high()` | Reference high H |
-| `rules.stop_line()` | Three-tier stop loss |
+| `rules.stop_line()` | Three-tier stop |
 | `rules.weekly_effective_low()` | Weekly effective low |
 | `engine.decide()` | Decision truth table: ARM / BUY / CANCEL / SKIP / HOLD / SELL |
 | `engine._sector_count()` / `_size_order()` | Sector cap / equal weight |
-| `engine.analyze()` | Data integrity check + full analysis |
+| `engine.analyze()` | Data integrity check plus full analysis |
 
 ---
 
-## Project layout
+## Where everything lives
 
 ```
 holdle-screener/
-├── config.example.json    # Parameter template (copy to config.json)
-├── universe.json          # 184-ticker broad universe, 11 GICS sectors
-├── rules.py               # Pure functions: indicators + criteria (27 self-tests)
-├── engine.py              # Main flow: scan → decide → execute → record
-├── alpaca_io.py           # Alpaca data + paper trading wrapper (keys from env only)
-├── screen.py              # Broad-universe screener (two-stage, 28 self-tests)
-├── run.py                 # CLI entry point
-├── report.py              # Performance report: return / benchmark / max drawdown
-├── audit_h.py             # Reference-high H auditing tool
-├── simtest.py             # Offline end-to-end drill (70 assertions)
-├── verify_vs_reference.py # Indicator cross-check against reference values (16)
+├── config.example.json    Parameter template, copy to config.json
+├── universe.json          184-ticker pool, 11 GICS sectors
+├── rules.py               Pure functions: indicators and criteria, 27 self-tests
+├── engine.py              Main flow: scan → decide → execute → record
+├── alpaca_io.py           Alpaca data and paper trading, keys from env only
+├── screen.py              Broad-universe screener, two stages, 28 self-tests
+├── run.py                 CLI entry point
+├── report.py              Performance report: return / benchmark / max drawdown
+├── audit_h.py             Reference-high auditing tool
+├── simtest.py             Offline end-to-end drill, 70 assertions
+├── verify_vs_reference.py Indicator cross-check, 16 assertions
 └── docs/
-    └── methodology.md     # Full methodology write-up (Chinese)
+    └── methodology.md     Full methodology write-up (Chinese)
 ```
 
-### Runtime artifacts
+Running it produces these:
 
 | Path | Content |
 |---|---|
 | `ledger/YYYY-MM-DD.md` | Daily action log |
-| `ledger/trades.jsonl` | Full action stream, one JSON per line (for post-mortems) |
-| `state/portfolio.json` | Positions / pending entries / re-entry counters (the system's "memory") |
+| `ledger/trades.jsonl` | Full action stream, one JSON per line, good for post-mortems |
+| `state/portfolio.json` | Positions, pending entries, re-entry counters — the system's memory |
 | `screens/YYYY-MM-DD.md` | Screener report |
 
 ---
 
-## Testing
+## Configuration
+
+`config.json` is the only file you need to touch. Change parameters, not code.
+
+```jsonc
+{
+  "mode": "dry",              // dry=plans only / paper=Alpaca paper / live=disabled
+  "mandate": {
+    "start": "2026-09-16",    // autonomous trading window
+    "end":   "2026-10-16",
+    "benchmark": "SPY"        // SPY, not QQQ — don't give yourself a volatile benchmark to hide behind
+  },
+  "account": {
+    "num_positions": 5,       // capital ÷ 5 = per-name allocation
+    "same_sector_max": 2      // at most 2 per sector
+  },
+  "rules": {
+    "macd_fast": 12, "macd_slow": 26, "macd_signal": 9,
+    "scenario2_multiplier": 1.1,        // "shrinking to expanding" threshold
+    "breakout_deadline_days": 60,       // void if not broken
+    "stop_loss_1": 0.8, "stop_loss_2": 0.9, "stop_loss_3": 1.0
+  },
+  "watchlist": []             // leave empty; screen.py --apply fills it
+}
+```
+
+### Keys
+
+No key ever goes into a file. They are read from environment variables, with a fallback to
+the Windows per-user registry.
+
+```bash
+setx ALPACA_API_KEY    "your Paper Key"
+setx ALPACA_SECRET_KEY "your Paper Secret"
+# reopen the terminal for this to take effect
+python alpaca_io.py   # prints the source, not the key
+```
+
+Why the second layer: `setx` writes to the registry, and only processes started after it
+inherit the value. A scheduled task launched by a long-running parent that started earlier
+won't see it — and the result is a silent failure every morning with zero trades. I hit this
+for real.
+
+---
+
+## Tests
 
 | Suite | Assertions | Needs network | Covers |
 |---|---|---|---|
-| `python rules.py` | 27 | ❌ | MACD convention, State A, pre-check, first red bar, stops, H window boundary |
-| `python simtest.py` | 70 | ❌ | Decision truth table, full pipeline, state persistence, data integrity, report gate, benchmark & drawdown, consumed entries, H sourcing |
-| `python screen.py --selftest` | 28 | ❌ | Screening consistency, deadline boundaries, delisting detection, watchlist safety, sector alignment |
-| `python verify_vs_reference.py` | 16 | ✅ | Engine MACD / first-red-bar vs. external reference values |
+| `python rules.py` | 27 | No | MACD convention, State A, pre-check, first red bar, stops, H window boundary |
+| `python simtest.py` | 70 | No | Decision truth table, full pipeline, state persistence, data integrity, report gate, benchmark and drawdown, consumed entries, H sourcing |
+| `python screen.py --selftest` | 28 | No | Screening consistency, deadline boundaries, delisting detection, watchlist safety, sector alignment |
+| `python verify_vs_reference.py` | 16 | Yes | Engine MACD and first-red-bar against external reference values |
 
-**Why so much testing:** bugs in this class of system are mostly **silent** — no error, it
-just stops working, or quietly buys one extra time. Without assertions you only notice that
-"there are no signals anymore".
+Why the effort: bugs in this class of system are mostly silent. Nothing errors, it just stops
+working, or quietly buys one extra time. Without assertions, all you notice is that signals
+seem to have dried up.
 
 ---
 
 ## Known limitations
 
-Treat this as **work in progress**.
+Treat this as unfinished.
 
-1. **Weekly effective low is an approximation.** The original rule is "pullback green weekly bar + subsequent new high → that low becomes the reference". The code approximates it with a swing-low window (3 weeks each side by default). A few percentage points of drift is possible in extreme conditions.
-2. **Fills are approximated by the latest close.** No slippage, no spread, no pre/post market. **Paper results do not represent live results.**
-3. **MACD needs warm-up.** EMAs need dozens of periods to converge. Default lookback is 60 monthly bars.
-4. **Signal lookback is 4 months.** Monthly indicators update once a month; checking only the latest bar misses signals. Signals older than 4 months are not triggered.
-5. **Sector classification is a static table.** Manually maintained; does not follow GICS changes.
-6. **No fundamental screening** (biggest gap). The six financial factors are not implemented; "pick well" is approximated by a curated pool.
-7. **Adjustment is the biggest data trap.** Alpaca returns **unadjusted** prices by default (`adjustment='raw'`). Real incidents: a 10:1 split made one ticker show a fake cliff "1922.91 → 301.49" and a histogram of −303 (true value +8.41); another ticker had an unadjusted weekly series alongside an adjusted monthly series — **same stock, two timeframes, two conventions**. The code now explicitly requests `Adjustment.ALL`, tags caches with the convention, and invalidates stale caches when it changes.
-8. **Pre-check lookback is an interpretive choice.** Compares 3 complete months by default (current month ignored if incomplete).
-9. **IEX data feed.** The free tier defaults to IEX; volume and extreme prices may differ from consolidated tape.
-10. **Requires a machine that stays on** to run scheduled tasks.
-11. **Taking the *first* qualifying high for H is an interpretive choice.** The source material only says "wait for price to spike, forming a short-term high H" — it does not specify first vs. highest. Change point is a single function.
-12. **Parameters are calibrated, not optimized.** No parameter search was performed, and it is not recommended — monthly signals are rare and overfitting is meaningless.
+1. The weekly effective low is an approximation. The original rule is "pullback green weekly bar, then a new high → that low becomes the reference". The code approximates it with a swing-low window, three weeks either side by default. A few percentage points of drift is possible in extreme conditions.
+2. Fills are approximated by the latest close. No slippage, no spread, no pre- or post-market. Paper results do not represent live results.
+3. MACD needs warm-up. EMAs need dozens of periods to converge. Default lookback is 60 monthly bars.
+4. Signal lookback is 4 months. Monthly indicators update once a month, so checking only the latest bar misses signals. Anything older than 4 months won't trigger.
+5. Sector classification is a static table. Hand-maintained, and it won't follow GICS changes.
+6. No fundamental screening. This is the biggest gap. The six financial factors aren't implemented; selection is approximated by a curated pool.
+7. Adjustment is the biggest data trap. Alpaca returns unadjusted prices by default (`adjustment='raw'`). I hit this: a 10:1 split gave KLAC a fake monthly cliff from 1922.91 to 301.49, producing a histogram of −303 when the real value was +8.41. AVGO had an unadjusted weekly series sitting next to an adjusted monthly one — same stock, two timeframes, two conventions. The code now requests `Adjustment.ALL` explicitly, tags caches with the convention, and invalidates stale caches when it changes.
+8. The pre-check lookback is an interpretive choice. It compares 3 complete months by default, ignoring the current month when incomplete. That value was calibrated once; going stricter conflicts with conclusions I'd already delivered.
+9. IEX data feed. The free tier defaults to IEX. Volume and extreme prices may differ from the consolidated tape.
+10. Needs a machine that stays on to run scheduled tasks.
+11. Taking the first qualifying high for H is also an interpretive choice. The source material only says "wait for price to spike, forming a short-term high H" — it doesn't say first or highest. The current implementation takes the first one that qualifies. If you think it should be the window's highest, the change point is a single function, `rules.find_reference_high()`.
+12. Parameters are calibrated, not optimized. I didn't run a parameter search and don't recommend one. Monthly signals are rare; overfitting is meaningless here.
 
 ---
 
 ## Design war stories
 
-Possibly the most valuable part of this repository. **Every item below was hit for real and is locked down by a regression test.**
+I think this is the most valuable part of the repository. Every item below was hit for real
+and is locked down by a regression test.
 
-### 1. The silent no-op bug — reference high eaten by a window boundary
+### The silent no-op: reference high eaten by a window boundary
 
-`find_reference_high()` used to start scanning for local highs at `start_idx + window`,
-which effectively declared **"the first 5 bars of the entry window can never be the
-reference high."**
+`find_reference_high()` used to start scanning for local highs at `start_idx + window`, which
+effectively declared that the first 5 bars of the entry window could never be the reference
+high.
 
-But the spike most often happens right at the start of the month after the signal —
-that is exactly where fresh money enters.
+But the spike most often happens right at the start of the month after the signal. That is
+exactly where fresh money enters.
 
-Consequence: for one ticker the window's highest point fell on bar 3, was permanently
-skipped, and no later local high exceeded it. The system then displayed "waiting for a
-spike" and **silently idled until the deadline**. No error, no action.
+The result: for one ticker the window's highest point fell on bar 3 and was permanently
+skipped, and no later local high exceeded it. The system then displayed "waiting for a spike"
+and idled silently until the deadline. No error, no action.
 
-The fix truncates the comparison window at the left boundary, instead of mistaking the
-**entry window's boundary** for the **data's boundary**:
+The fix truncates the comparison window at the left boundary, instead of mistaking the entry
+window's boundary for the data's boundary:
 
 ```python
 lo = max(start_idx, i - window)   # no longer requires i >= start_idx + window
 hi = min(n, i + window + 1)
 ```
 
-Verified afterwards against the methodology's own reference case: the engine's computed H
-matched the documented value exactly.
+I verified it afterwards against the methodology's own reference case: the computed H matched
+the documented value exactly.
 
-### 2. Buying on a stale snapshot
+### Buying on a stale snapshot
 
 `decide()` used to read `h_price` from state — a snapshot written on the day the signal was
 armed. Any change to the algorithm or the data convention turns it into a stale value.
 
-Consequence: with old H=109.56 and new H=110.69, a price landing between the two would make
-the system **buy without a genuine breakout of the prior high**. No error, just one extra
-silent buy.
+The result: with old H=109.56 and new H=110.69, a price landing between the two would make the
+system buy without a genuine breakout of the prior high. No error, just one extra silent buy.
 
-The fix uses the value computed in the current run; state is only a fallback.
+It now uses the value computed in the current run, with state as a fallback only.
 
-### 3. Beautiful signals from delisted tickers
+### Beautiful signals from delisted tickers
 
-An acquired delisted company's monthly bars stop at the delisting month, but the "last 4
+An acquired, delisted company's monthly bars stop at the delisting month, but the "last 4
 bars" still contain a perfect first red bar. The screener cheerfully reports it as a buy
-point while you stare at a ticker you cannot look up.
+point while you stare at a ticker you can't look up.
 
-`is_stale()` exists to catch exactly this.
+`is_stale()` exists to catch that.
 
-### 4. The already-consumed entry opportunity
+### The entry opportunity was already consumed
 
 The screener scans hundreds of tickers with a 4-month lookback, so it easily picks up names
-that **already broke above H weeks ago and have since fallen back**. If the system still
-waits for "a breakout above H", it is actually waiting for the **second** breakout — which
-is not a valid entry in this methodology.
+that broke above H weeks ago and have since fallen back. If the system still waits for "a
+breakout above H", it is actually waiting for the second breakout, which is not a valid entry
+in this methodology.
 
 `h_broken_date` records whether the close ever exceeded H between H's formation and today.
 
-**Why SKIP even when price is still above H:** we were not present on the breakout day, so
-we **cannot know how far the move already went**. Price might be 1% above H, or it might have
-run to +30% and come back to +1%. Buying in those two cases is completely different, and the
-data cannot tell them apart. **Cannot distinguish → do nothing.**
+Why SKIP even when price is still above H: we weren't present on the breakout day, so we
+cannot know how far the move already went. Price might be 1% above H, or it might have run to
++30% and come back to +1%. Buying in those two cases is completely different, and the data
+cannot tell them apart. Can't distinguish, don't act.
 
-### 5. Corrupted data must not trigger trades
+### Corrupted data must not trigger trades
 
-Two integrity checks: single-day gap (±50%) and cross-timeframe consistency (5%). If either
-fails, the ticker is **excluded from all decisions** this run.
+There are two integrity checks: single-day gaps (±50%) and cross-timeframe consistency (5%).
+If either fails, the ticker is excluded from all decisions this run.
 
-The critical design choice: **corrupted data + a position that would trigger a stop → still
-do not sell.** Better to stand still than to act wrongly; wait for the data to recover. This
-is locked down by a dedicated test.
+One design choice matters here: corrupted data plus a position that would trigger a stop still
+does not sell. Better to stand still than to act wrongly; wait for the data to recover. A
+dedicated test locks this down.
 
-Gaps are judged on daily bars only, never monthly — a −39% monthly bar can be a *genuine*
+Gaps are judged on daily bars only, never monthly. A −39% monthly bar can be a genuine
 gradual decline, and judging on monthly would kill real signals.
 
-### 6. Reports must show the real criterion
+### Reports must show the real criterion
 
-A report column once showed "entry gate" based only on "has the signal month passed?", which
-produced the misleading display "pre-check failed, but gate shows 🟢 open".
+A report column once showed "entry gate" based only on whether the signal month had passed,
+which produced the misleading display "pre-check failed, but gate shows open".
 
-"Entering the entry period" is a temporal concept and **does not mean an entry is allowed**.
-The report must use the real `gate_ok`. Locked down by a test.
+Entering the entry period is a temporal concept. It does not mean an entry is allowed. The
+report has to use the real `gate_ok`. Another one locked down by a test.
 
 ---
 
 ## Roadmap
 
-- [ ] **Fundamental screening layer** (biggest gap): wire up financial data, implement ROE / gross margin / net margin / cash ratio / EPS screening
-- [ ] Exact weekly effective-low implementation (replacing the window approximation)
-- [ ] A fuller backtesting framework (currently only cross-validation against reference values)
-- [ ] Multi-market / multi-universe support
-- [ ] Parameter sensitivity analysis (not optimization — checking whether results collapse when parameters move)
+- The fundamental screening layer, i.e. the biggest gap. Wire up financial data and implement ROE, gross margin, net margin, cash ratio and EPS screening
+- An exact weekly effective-low implementation to replace the window approximation
+- A fuller backtesting framework. Right now there's cross-validation against reference values but no long-horizon historical backtest
+- Multi-market and multi-universe support
+- Parameter sensitivity analysis. Not optimization — checking whether results collapse when parameters move
 
 ## Contributing
 
-Issues and PRs are welcome. Especially:
+Issues and PRs welcome. What I'd most like to see:
 
-- Pointing out **deviations** between the implementation and the source methodology (most valuable)
+- Deviations between the implementation and the source methodology. This is the most valuable kind of report
 - Additional edge-case tests
-- Data-source adapters (non-Alpaca market data)
+- Adapters for non-Alpaca market data
 - Documentation fixes
 
 Before opening a PR, make sure `python rules.py && python simtest.py && python screen.py --selftest` is all green.
 
-## License & attribution
+## License
 
-Code released under the **MIT License**, see [LICENSE](LICENSE).
-Full copyright, attribution, trademark and disclaimer terms: **[NOTICE.md](NOTICE.md)** — **please read it before redistributing.**
+MIT, see [LICENSE](LICENSE). Full copyright, attribution, trademark and disclaimer terms are
+in [NOTICE.md](NOTICE.md) — worth reading before you redistribute.
 
-- **Methodology source**: the HOLDLE public course. Copyright in the methodology and its expression belongs to its original author.
-- **Independent implementation**: not affiliated with, not cooperating with, and not endorsed by the original author. The name in the repository title is used only to **identify the rule set's origin** (nominative use).
-- **No course material**: this repository contains no course text, slides, videos, images or paid content. The docs describe *what the code does*, not what the course says.
-- **Rules ≠ expression**: copyright protects specific expression (text, charts, media), not ideas or methods. This project implements rule logic and describes it in its own words.
-- **Rights holders can object**: if you believe the name or content exceeds fair reference, open an issue and we will rename or remove the material.
+The methodology comes from the HOLDLE public course, and copyright in it belongs to its
+original author. This repository is an independent implementation: not affiliated with, not
+cooperating with, and not endorsed by the original author. The name in the repository title is
+used only to identify which rule set is being implemented. No course text, slides, videos or
+media are included.
+
+If a rights holder believes the name or content exceeds fair reference, open an issue and I'll
+rename or remove it.
 
 ---
 
-*For educational and rule-verification purposes only. Not investment advice. Markets carry risk; decide carefully.*
+*For learning and rule verification only. Not investment advice. Markets carry risk; decide carefully.*
